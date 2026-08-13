@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UTM Builder</title>
+<style>
+:root {
+  --bg:#f6f7f9; --panel:#fff; --text:#17202a; --muted:#6b7280; --line:#d9dee5;
+  --accent:#111827; --danger:#b42318; --ok:#067647; --soft:#eef1f4; --r:15px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:980px;margin:auto;padding:32px 20px 60px}
+h1{margin:0 0 8px;font-size:40px;letter-spacing:-.03em}
+.intro{color:var(--muted);margin:0 0 24px;line-height:1.5}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:22px;margin:0 0 18px;box-shadow:0 10px 28px rgba(0,0,0,.05)}
+h2{font-size:20px;margin:0 0 18px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.full{grid-column:1/-1}
+label{display:block;font-weight:800;font-size:13px;margin-bottom:6px}
+input,select{width:100%;min-height:44px;border:1px solid #cfd5dc;border-radius:10px;padding:10px 12px;font:inherit;background:#fff}
+input:focus,select:focus{outline:0;border-color:#667085;box-shadow:0 0 0 3px rgba(102,112,133,.12)}
+.hint,.error,.status{font-size:12px;margin-top:6px;line-height:1.45}
+.hint{color:var(--muted)} .error{color:var(--danger);font-weight:700}
+.readout{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;line-height:1.5;margin-top:14px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button{border:0;border-radius:10px;padding:10px 16px;min-height:42px;font:inherit;font-weight:800;cursor:pointer}
+.primary{background:var(--accent);color:#fff} .secondary{background:#e9edf1;color:var(--accent)}
+.hidden{display:none!important}
+.status.ok{color:var(--ok);font-weight:700} .status.bad{color:var(--danger);font-weight:700}
+.rule{padding:11px 12px;background:#f8fafc;border-left:3px solid #9ca3af;margin-top:12px;font-size:13px;color:#4b5563}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.full{grid-column:auto}h1{font-size:32px}}
+</style>
+</head>
+<body>
+<main>
+  <h1>UTM Builder</h1>
+  <p class="intro">Build a standardized campaign name and tracking URL using controlled campaign taxonomy.</p>
+
+  <section class="card">
+    <h2>1. Source & Medium</h2>
+    <div class="grid">
+      <div>
+        <label for="source">UTM Source</label>
+        <select id="source"></select>
+      </div>
+      <div id="customSourceWrap" class="hidden">
+        <label for="customSource">Custom Source</label>
+        <input id="customSource" placeholder="e.g. Partner Site">
+        <div class="hint">Maximum 2 words. Formatting is normalized automatically.</div>
+        <div class="error" id="customSourceError"></div>
+      </div>
+      <div>
+        <label for="medium">UTM Medium</label>
+        <select id="medium"></select>
+        <div class="hint" id="mediumHint"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Campaign Name</h2>
+    <div class="grid">
+      <div>
+        <label for="branchId">Branch ID</label>
+        <select id="branchId">
+          <option value="">-- select --</option>
+        </select>
+        <div class="hint">Select the Branch ID. Leading zeros are preserved.</div>
+        <div class="error" id="branchError"></div>
+      </div>
+
+      <div>
+        <label for="branchName">Branch Name</label>
+        <input id="branchName" type="text" readonly placeholder="Automatically selected">
+        <div class="hint">Branch Name is populated automatically from the selected Branch ID.</div>
+      </div>
+
+      <div>
+        <label for="fy">Fiscal Year</label>
+        <select id="fy"></select>
+        <div class="hint">Select a fiscal year between FY26 and FY36.</div>
+      </div>
+
+      <div>
+        <label for="quarter">Quarter</label>
+        <select id="quarter">
+          <option value="">-- select --</option>
+          <option value="q1">Q1</option>
+          <option value="q2">Q2</option>
+          <option value="q3">Q3</option>
+          <option value="q4">Q4</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="identifier">Identifier</label>
+        <select id="identifier">
+          <option value="">-- select --</option>
+          <option value="87-decisions">87-decisions</option>
+          <option value="estate-planning">estate-planning</option>
+          <option value="blog">blog</option>
+          <option value="direct-cremation">direct-cremation</option>
+          <option value="online-planning">online-planning</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div id="customIdentifierWrap" class="hidden">
+        <label for="customIdentifier">Custom Identifier</label>
+        <input id="customIdentifier" placeholder="e.g. Local Awareness">
+        <div class="hint">Maximum 2 words. Lowercase and hyphenation are applied automatically.</div>
+        <div class="error" id="customIdentifierError"></div>
+      </div>
+
+      <div>
+        <label for="objective">Campaign Objective</label>
+        <select id="objective"></select>
+      </div>
+
+      <div id="campaignTypeWrap" class="hidden">
+        <label for="campaignType">Campaign Type</label>
+        <select id="campaignType"></select>
+        <div class="hint" id="campaignTypeHint"></div>
+      </div>
+    </div>
+
+    <div class="rule">Campaign elements are separated by underscores. Multi-word values use hyphens. Example: <strong>7290_taylor-newmarket_fy27-q3_estate-planning_lead-gen_search</strong></div>
+    <div class="readout" id="campaignReadout">Campaign name will appear here</div>
+    <div class="actions">
+      <button class="secondary" id="copyCampaign" type="button">Copy campaign name</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3. Destination URL</h2>
+    <div class="grid">
+      <div class="full">
+        <label for="destination">Destination URL</label>
+        <input id="destination" type="url" placeholder="https://example.com/page">
+        <div class="error" id="urlError"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="generate" type="button">Generate Final URL</button>
+    </div>
+    <div id="resultWrap" class="hidden">
+      <div class="readout" id="finalUrl"></div>
+      <div class="actions">
+        <button class="secondary" id="copyUrl" type="button">Copy final URL</button>
+        <button class="primary" id="saveExcel" type="button">Save to Excel</button>
+      </div>
+      <div class="status" id="saveStatus"></div>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+</main>
+
+<script>
+const BRANCHES = [
+  {id:"7690",name:"highland-hills"},
+  {id:"7670",name:"pleasantview"},
+  {id:"7660",name:"glendale"},
+  {id:"7650",name:"brampton"},
+  {id:"7640",name:"capital"},
+  {id:"7610",name:"glen-oaks"},
+  {id:"7600",name:"forest-lawn"},
+  {id:"5690",name:"eden-brook"},
+  {id:"5680",name:"hillcrest"},
+  {id:"5630",name:"glenwood"},
+  {id:"5380",name:"fair-haven"},
+  {id:"5320",name:"regina"},
+  {id:"5180",name:"glen-eden"},
+  {id:"5160",name:"westlawn"},
+  {id:"5070",name:"mountain-view"},
+  {id:"5060",name:"valley-view"},
+  {id:"5050",name:"rideau"},
+  {id:"5030",name:"evergreen"},
+  {id:"5000",name:"chapel-lawn"},
+  {id:"0701",name:"glenview"},
+  {id:"0671",name:"westlawn"},
+  {id:"0661",name:"cedar-valley"},
+  {id:"0651",name:"hatley"},
+  {id:"0641",name:"valley-view"},
+  {id:"0631",name:"glenwood"},
+  {id:"0621",name:"evergreen"},
+  {id:"0611",name:"mountain-view"},
+  {id:"0601",name:"eden-brook"},
+  {id:"0471",name:"glenlawn"},
+  {id:"0461",name:"glen-eden"},
+  {id:"0451",name:"chapel-lawn"},
+  {id:"0441",name:"sunset"},
+  {id:"0431",name:"hillcrest"},
+  {id:"0421",name:"regina"},
+  {id:"0411",name:"prince-albert"},
+  {id:"0391",name:"pineridge"},
+  {id:"0381",name:"lakeview"},
+  {id:"0351",name:"highland-hills"},
+  {id:"0341",name:"brampton"},
+  {id:"0301",name:"victoria"},
+  {id:"0291",name:"greenlawn"},
+  {id:"0281",name:"burlington"},
+  {id:"0271",name:"glendale"},
+  {id:"0261",name:"pleasantview"},
+  {id:"0241",name:"forest-lawn"},
+  {id:"0231",name:"memory"},
+  {id:"0221",name:"white-chapel"},
+  {id:"0211",name:"chapel-hill"},
+  {id:"0201",name:"glen-oaks"},
+  {id:"0181",name:"highland"},
+  {id:"0171",name:"resthaven"},
+  {id:"0161",name:"rosemount"},
+  {id:"0151",name:"capital"},
+  {id:"0142",name:"rideau"},
+  {id:"0121",name:"glenhaven"},
+  {id:"0101",name:"mountlawn"},
+  {id:"0071",name:"dartmouth"},
+  {id:"0061",name:"oakridge"},
+  {id:"0021",name:"fair-haven"},
+  {id:"8888",name:"dennis-toll-fh"},
+  {id:"7830",name:"leclair-cremation-centre"},
+  {id:"7820",name:"adams-funeral-home"},
+  {id:"7800",name:"harbourview"},
+  {id:"7760",name:"windsor-cremation"},
+  {id:"7750",name:"niagara-cremation"},
+  {id:"7740",name:"scc-london"},
+  {id:"7730",name:"maple-leaf-cremation"},
+  {id:"7720",name:"bay-of-quinte"},
+  {id:"7710",name:"kingston-cremation"},
+  {id:"7700",name:"scc-niagara"},
+  {id:"7680",name:"memory-garden"},
+  {id:"7630",name:"victoria-greenlawn"},
+  {id:"7620",name:"mount-lawn"},
+  {id:"7590",name:"kelly-orleans"},
+  {id:"7580",name:"kelly-kanata"},
+  {id:"7570",name:"kelly-barrhaven"},
+  {id:"7560",name:"kelly-walkley"},
+  {id:"7550",name:"kelly-carling"},
+  {id:"7540",name:"kelly-somerset"},
+  {id:"7520",name:"peterborough-cremation"},
+  {id:"7500",name:"robert-reid"},
+  {id:"7490",name:"burke"},
+  {id:"7480",name:"highland-scarborough"},
+  {id:"7460",name:"memorial"},
+  {id:"7450",name:"lynett"},
+  {id:"7440",name:"highland-markham"},
+  {id:"7410",name:"melady"},
+  {id:"7400",name:"marcotte"},
+  {id:"7380",name:"janisse"},
+  {id:"7370",name:"nisbett"},
+  {id:"7360",name:"penetanguishene"},
+  {id:"7350",name:"nicholls"},
+  {id:"7340",name:"oneill"},
+  {id:"7320",name:"mccallum-palla"},
+  {id:"7290",name:"taylor-newmarket"},
+  {id:"7280",name:"jenkens"},
+  {id:"7240",name:"mceachnie"},
+  {id:"7230",name:"tompkins-township"},
+  {id:"7220",name:"tompkins-central"},
+  {id:"7190",name:"butler-niagara"},
+  {id:"7170",name:"mcd-b-scarborough"},
+  {id:"7140",name:"oakview"},
+  {id:"7130",name:"scott-woodbridge"},
+  {id:"7120",name:"scott-weston-road"},
+  {id:"7110",name:"scott-brampton"},
+  {id:"7080",name:"morris-sutton"},
+  {id:"7070",name:"james-h-sutton"},
+  {id:"7050",name:"l-g-wallace"},
+  {id:"7040",name:"scc-hamilton"},
+  {id:"7020",name:"d-b-burlington"},
+  {id:"7010",name:"d-b-ancaster"},
+  {id:"7000",name:"j-j-patterson-sons"},
+  {id:"5780",name:"calgary-cremation"},
+  {id:"5760",name:"central-alberta-cremation"},
+  {id:"5750",name:"cb-surrey"},
+  {id:"5740",name:"nova-scotia-coroners"},
+  {id:"5730",name:"montreal-cremation-services"},
+  {id:"5720",name:"cole-harbour"},
+  {id:"5710",name:"red-deer"},
+  {id:"5700",name:"eventide"},
+  {id:"5670",name:"halifax-regional-crematorium"},
+  {id:"5660",name:"glen-lawn"},
+  {id:"5640",name:"leydens-calgary"},
+  {id:"5620",name:"r-d-lindsay-windsor"},
+  {id:"5500",name:"scott-mississauga"},
+  {id:"5490",name:"garneau"},
+  {id:"5450",name:"campbells-funeral-home"},
+  {id:"5310",name:"park"},
+  {id:"5300",name:"river-park"},
+  {id:"5280",name:"canadian-alternative"},
+  {id:"5270",name:"delta"},
+  {id:"5260",name:"armstrong"},
+  {id:"5240",name:"sands-nanaimo"},
+  {id:"5230",name:"sands-duncan"},
+  {id:"5220",name:"victoria-cremation-services"},
+  {id:"5210",name:"sands-colwood"},
+  {id:"5200",name:"sands-victoria"},
+  {id:"5190",name:"atlantic-dartmouth"},
+  {id:"5140",name:"richmond"},
+  {id:"5130",name:"avalon-surrey"},
+  {id:"5120",name:"atlantic-sackville"},
+  {id:"5110",name:"south-side"},
+  {id:"5100",name:"desjardins"},
+  {id:"5090",name:"atlantic-halifax"},
+  {id:"5080",name:"winnipeg-cremation"},
+  {id:"7960",name:"scc-london"},
+  {id:"4000",name:"fond-farewells"},
+  {id:"0000",name:"national"},
+  {id:"6190",name:"bay-gardens-burlington"},
+  {id:"6200",name:"bay-gardens-hamilton"},
+  {id:"0741",name:"bayview-cemetery"},
+  {id:"6170",name:"steele-funeral-home"},
+  {id:"5510",name:"dartmouth-memorial-gardens"},
+  {id:"7840",name:"marshall-driver"},
+  {id:"6180",name:"scc-bloor-west"},
+  {id:"7780",name:"scc-north-gta"},
+  {id:"7880",name:"scc-ottawa"},
+  {id:"7810",name:"brantford-toll-funeral"},
+  {id:"7860",name:"banwell-windsor-chapel"},
+  {id:"7850",name:"central-windsor-chapel"},
+  {id:"7870",name:"south-windsor-chapel"},
+  {id:"4010",name:"fond-farewells-toronto"},
+  {id:"5860",name:"grays-funeral"},
+  {id:"1111",name:"simple-choice"},
+  {id:"0141",name:"rideau-cemetery"},
+  {id:"5820",name:"red-deer-cremation-basics"},
+  {id:"6100",name:"scc-windsor"},
+  {id:"7950",name:"kingston-cremation-basics"},
+  {id:"7980",name:"belleville-cremation-basics"},
+  {id:"5870",name:"oakridge-chapel"},
+  {id:"6220",name:"marshal-funeral"},
+  {id:"5840",name:"regina-cremation"},
+  {id:"7930",name:"scc-kw"}
+];
+
+const ALL_MEDIUMS = [
+  ["cpc","Google Ads and Bing/Microsoft Search Ads"],
+  ["paid-social","Paid social advertising"],
+  ["print","Print materials such as direct mail, newspaper, or magazine"],
+  ["display","Display and CPM advertising"],
+  ["events","Seminars, webinars, in-person and sponsored events"],
+  ["referral","Third-party sponsored content, partner or sales-shared links"],
+  ["social","Organic social posting"],
+  ["email","Email campaigns"],
+  ["video","Video advertising"],
+  ["organic","Organic listings / non-paid organic links"]
+];
+
+const SOURCES = ["facebook","google","bing","instagram","twitter","direct-mail","linkedin","marketo","other"];
+
+const OBJECTIVES = [
+  "brand-awareness","lead-gen","calls","event-registrations","booking-appointment",
+  "leadgen-contest","traffic","direct-marketing","seminar-signups","ching-ming",
+  "sc-ching-ming","tc-ching-ming","qc-sc-ching-ming","qc-tc-ching-ming",
+  "legacy-webinar","google-mybusiness","contact-us","newsletter-signup"
+];
+
+const CAMPAIGN_TYPES = {
+  "google|cpc": ["search","display","shopping","video","pmax","demand-gen","app"],
+  "facebook|paid-social": ["awareness","traffic","engagement","leads","sales","lead-gen"]
+};
+
+const PAID_MEDIUMS = new Set(["cpc","paid-social","display","video"]);
+const FLOW_URL = 'https://a63bb126a4024ff2beab95678b9682.da.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/24/workflows/5a2081ee6f8c4dfa8be0e9caecf97af7/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2EXMZwCgmbhqg9yMaRPetWmhE1JnJbp_EAWyJ23bKgU';
+const LOCAL_HISTORY_KEY = "utmBuilderSavedCampaignsV1";
+
+const $ = id => document.getElementById(id);
+
+function fillSelect(el, values, placeholder="-- select --") {
+  el.innerHTML = `<option value="">${placeholder}</option>`;
+  values.forEach(v => {
+    const value = Array.isArray(v) ? v[0] : v;
+    const label = Array.isArray(v) ? `${v[0]} — ${v[1]}` : v;
+    const o = document.createElement("option");
+    o.value = value; o.textContent = label; el.appendChild(o);
+  });
+}
+
+fillSelect($("source"), SOURCES);
+fillSelect($("objective"), OBJECTIVES);
+fillSelect($("fy"), Array.from({length:11},(_,i)=>`fy${26+i}`));
+
+BRANCHES.forEach(b => {
+  const o = document.createElement("option");
+  o.value = `${b.id} — ${b.name}`;
+  $("branches").appendChild(o);
+});
+
+function normalizeFreeText(value, maxWords=2) {
+  let cleaned = value.trim().toLowerCase()
+    .replace(/[_]+/g," ")
+    .replace(/[^a-z0-9\s-]+/g," ")
+    .replace(/-+/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+  const words = cleaned ? cleaned.split(" ") : [];
+  return { value: words.join("-"), words, valid: words.length > 0 && words.length <= maxWords };
+}
+
+function selectedSource() {
+  if ($("source").value !== "other") return $("source").value;
+  return normalizeFreeText($("customSource").value,2).value;
+}
+
+function updateMediums() {
+  const source = $("source").value;
+  let list = ALL_MEDIUMS;
+
+  if (source === "google") {
+    const allowed = new Set(["cpc","display","video","organic"]);
+    list = ALL_MEDIUMS.filter(x => allowed.has(x[0]));
+    $("mediumHint").textContent = "Google is limited to cpc, display, video, or organic.";
+  } else if (["facebook","instagram","twitter","linkedin"].includes(source)) {
+    const allowed = new Set(["paid-social","social"]);
+    list = ALL_MEDIUMS.filter(x => allowed.has(x[0]));
+    $("mediumHint").textContent = "This social source is limited to paid-social or social.";
+  } else {
+    $("mediumHint").textContent = "";
+  }
+
+  fillSelect($("medium"), list);
+  updateCampaignType();
+  updateCampaign();
+}
+
+function updateCampaignType() {
+  const source = selectedSource();
+  const medium = $("medium").value;
+  const key = `${source}|${medium}`;
+  const isPaid = PAID_MEDIUMS.has(medium);
+  const options = CAMPAIGN_TYPES[key];
+
+  if (!isPaid) {
+    $("campaignTypeWrap").classList.add("hidden");
+    $("campaignType").innerHTML = "";
+    $("campaignTypeHint").textContent = "";
+    return;
+  }
+
+  $("campaignTypeWrap").classList.remove("hidden");
+
+  if (options) {
+    fillSelect($("campaignType"), options);
+    $("campaignTypeHint").textContent = "Required for this paid campaign.";
+  } else {
+    $("campaignType").innerHTML = '<option value="">Mapping not defined yet</option>';
+    $("campaignTypeHint").textContent = "This paid source/medium combination still needs a campaign type taxonomy.";
+  }
+}
+
+function getBranch() {
+  return BRANCHES.find(b => b.id === $("branchId").value) || null;
+}
+
+function getIdentifier() {
+  const id = $("identifier").value;
+  if (id !== "other") return id;
+  return normalizeFreeText($("customIdentifier").value,2).value;
+}
+
+function updateCampaign() {
+  const branch = getBranch();
+  const fy = $("fy").value;
+  const q = $("quarter").value;
+  const identifier = getIdentifier();
+  const objective = $("objective").value;
+  const medium = $("medium").value;
+  const source = selectedSource();
+  const paid = PAID_MEDIUMS.has(medium);
+
+  let parts = [];
+  if (branch) parts.push(branch.id, branch.name);
+  if (fy && q) parts.push(`${fy}-${q}`);
+  if (identifier) parts.push(identifier);
+  if (objective) parts.push(objective);
+
+  if (paid) {
+    const key = `${source}|${medium}`;
+    if (CAMPAIGN_TYPES[key] && $("campaignType").value) parts.push($("campaignType").value);
+  }
+
+  $("campaignReadout").textContent = parts.length ? parts.join("_") : "Campaign name will appear here";
+}
+
+$("source").addEventListener("change", () => {
+  $("customSourceWrap").classList.toggle("hidden",$("source").value!=="other");
+  updateMediums();
+});
+
+$("customSource").addEventListener("input", () => {
+  const n = normalizeFreeText($("customSource").value,2);
+  $("customSourceError").textContent = $("customSource").value && !n.valid ? "Use a maximum of 2 words." : "";
+  updateCampaignType(); updateCampaign();
+});
+
+$("identifier").addEventListener("change", () => {
+  $("customIdentifierWrap").classList.toggle("hidden",$("identifier").value!=="other");
+  updateCampaign();
+});
+$("customIdentifier").addEventListener("input", () => {
+  const n = normalizeFreeText($("customIdentifier").value,2);
+  $("customIdentifierError").textContent = $("customIdentifier").value && !n.valid ? "Use a maximum of 2 words." : "";
+  updateCampaign();
+});
+
+["medium","branchId","fy","quarter","objective","campaignType"].forEach(id => {
+  $(id).addEventListener(id==="medium"||id==="campaignType"?"change":"input", () => {
+    if (id==="medium") updateCampaignType();
+    updateCampaign();
+  });
+});
+
+
+function getPayload() {
+  const branch = getBranch();
+  return {
+    timestamp: new Date().toISOString(),
+    branchId: branch ? branch.id : "",
+    branchName: branch ? branch.name : "",
+    fiscalYear: $("fy").value,
+    quarter: $("quarter").value,
+    identifier: getIdentifier(),
+    campaignObjective: $("objective").value,
+    campaignType: $("campaignType").value || "",
+    utmSource: selectedSource(),
+    utmMedium: $("medium").value,
+    utmCampaign: $("campaignReadout").textContent.trim(),
+    destinationUrl: $("destination").value.trim(),
+    finalUrl: $("finalUrl").textContent.trim()
+  };
+}
+
+function getLocalSavedCampaigns() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function markCampaignSaved(campaign) {
+  const list = getLocalSavedCampaigns();
+  if (!list.includes(campaign)) list.push(campaign);
+  localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(list.slice(-500)));
+}
+
+function isLocallyDuplicate(campaign) {
+  return getLocalSavedCampaigns().includes(campaign);
+}
+
+async function postToPowerAutomate(payload) {
+  try {
+    const response = await fetch(FLOW_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    let data = null;
+    try { data = await response.json(); } catch {}
+    return { verified: true, data };
+  } catch (err) {
+    await fetch(FLOW_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+      body: JSON.stringify(payload)
+    });
+    return { verified: false, error: String(err) };
+  }
+}
+
+$("generate").addEventListener("click", () => {
+  $("status").textContent = "";
+  $("status").className = "status";
+
+  const source = selectedSource();
+  const medium = $("medium").value;
+  const branch = getBranch();
+  const fy = $("fy").value;
+  const q = $("quarter").value;
+  const identifier = getIdentifier();
+  const objective = $("objective").value;
+  const paid = PAID_MEDIUMS.has(medium);
+  const key = `${source}|${medium}`;
+
+  $("branchError").textContent = branch ? "" : "Select a valid branch from the list.";
+
+  if ($("source").value==="other" && !normalizeFreeText($("customSource").value,2).valid) {
+    $("status").textContent = "Enter a valid custom source."; $("status").className="status bad"; return;
+  }
+  if ($("identifier").value==="other" && !normalizeFreeText($("customIdentifier").value,2).valid) {
+    $("status").textContent = "Enter a valid custom identifier."; $("status").className="status bad"; return;
+  }
+  if (!source || !medium || !branch || !fy || !q || !identifier || !objective) {
+    $("status").textContent = "Complete all required fields."; $("status").className="status bad"; return;
+  }
+  if (paid && !CAMPAIGN_TYPES[key]) {
+    $("status").textContent = "Campaign type mapping has not been defined yet for this paid source/medium combination.";
+    $("status").className="status bad"; return;
+  }
+  if (paid && !$("campaignType").value) {
+    $("status").textContent = "Select a campaign type."; $("status").className="status bad"; return;
+  }
+
+  const destination = $("destination").value.trim();
+  let url;
+  try {
+    url = new URL(destination);
+    if (!["http:","https:"].includes(url.protocol)) throw new Error();
+    $("urlError").textContent = "";
+  } catch {
+    $("urlError").textContent = "Enter a complete URL beginning with http:// or https://.";
+    return;
+  }
+
+  const campaign = $("campaignReadout").textContent;
+  url.searchParams.set("utm_source", source);
+  url.searchParams.set("utm_medium", medium);
+  url.searchParams.set("utm_campaign", campaign);
+
+  $("finalUrl").textContent = url.toString();
+  $("resultWrap").classList.remove("hidden");
+  $("saveStatus").textContent = "";
+  $("saveStatus").className = "status";
+  $("status").textContent = "Final UTM generated.";
+  $("status").className = "status ok";
+});
+
+
+$("saveExcel").addEventListener("click", async () => {
+  const saveStatus = $("saveStatus");
+  const campaign = $("campaignReadout").textContent.trim();
+  const finalUrl = $("finalUrl").textContent.trim();
+
+  saveStatus.textContent = "";
+  saveStatus.className = "status";
+
+  if (!finalUrl) {
+    saveStatus.textContent = "Generate the final UTM before saving.";
+    saveStatus.className = "status bad";
+    return;
+  }
+
+  if (!campaign || campaign.includes("will appear here")) {
+    saveStatus.textContent = "Campaign name is incomplete.";
+    saveStatus.className = "status bad";
+    return;
+  }
+
+  if (isLocallyDuplicate(campaign)) {
+    const proceed = confirm("This campaign was already saved from this browser. Save it again anyway?");
+    if (!proceed) {
+      saveStatus.textContent = "Save cancelled — duplicate detected in this browser.";
+      saveStatus.className = "status bad";
+      return;
+    }
+  }
+
+  const btn = $("saveExcel");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  saveStatus.textContent = "Sending to Excel…";
+
+  try {
+    const result = await postToPowerAutomate(getPayload());
+    markCampaignSaved(campaign);
+
+    if (result.verified) {
+      saveStatus.textContent = "Saved to Excel.";
+    } else {
+      saveStatus.textContent = "Request sent to Power Automate. Confirm the new row in Excel.";
+    }
+    saveStatus.className = "status ok";
+  } catch (err) {
+    saveStatus.textContent = "Could not send the UTM to Power Automate.";
+    saveStatus.className = "status bad";
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save to Excel";
+  }
+});
+
+async function copyValue(value, button) {
+  if (!value || value.includes("will appear here")) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    const old=button.textContent; button.textContent="Copied";
+    setTimeout(()=>button.textContent=old,1000);
+  } catch {}
+}
+$("copyCampaign").onclick = () => copyValue($("campaignReadout").textContent,$("copyCampaign"));
+$("copyUrl").onclick = () => copyValue($("finalUrl").textContent,$("copyUrl"));
+
+fillSelect($("medium"), ALL_MEDIUMS);
+</script>
+</body>
+</html>
