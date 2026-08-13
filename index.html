@@ -383,8 +383,16 @@ fillSelect($("fy"), Array.from({length:11},(_,i)=>`fy${26+i}`));
 
 BRANCHES.forEach(b => {
   const o = document.createElement("option");
-  o.value = `${b.id} — ${b.name}`;
-  $("branches").appendChild(o);
+  o.value = b.id;
+  o.textContent = b.id;
+  $("branchId").appendChild(o);
+});
+
+$("branchId").addEventListener("change", () => {
+  const branch = BRANCHES.find(b => b.id === $("branchId").value) || null;
+  $("branchName").value = branch ? branch.name : "";
+  $("branchError").textContent = "";
+  updateCampaign();
 });
 
 function normalizeFreeText(value, maxWords=2) {
@@ -692,7 +700,7 @@ async function copyValue(value, button) {
 $("copyCampaign").onclick = () => copyValue($("campaignReadout").textContent,$("copyCampaign"));
 $("copyUrl").onclick = () => copyValue($("finalUrl").textContent,$("copyUrl"));
 
-fillSelect($("medium"), ALL_MEDIUMS);
+updateMediums();
 </script>
 </body>
 </html>
