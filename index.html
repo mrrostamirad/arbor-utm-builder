@@ -356,9 +356,16 @@ const OBJECTIVES = [
   "legacy-webinar","google-mybusiness","contact-us","newsletter-signup"
 ];
 
+const PAID_SOCIAL_CAMPAIGN_TYPES = ["awareness","traffic","engagement","leads","sales","lead-gen"];
+
 const CAMPAIGN_TYPES = {
-  "google|cpc": ["search","display","shopping","video","pmax","demand-gen","app"],
-  "facebook|paid-social": ["awareness","traffic","engagement","leads","sales","lead-gen"]
+  "google|cpc": ["search","shopping","pmax","demand-gen","app"],
+  "google|display": ["display"],
+  "google|video": ["video"],
+  "facebook|paid-social": PAID_SOCIAL_CAMPAIGN_TYPES,
+  "instagram|paid-social": PAID_SOCIAL_CAMPAIGN_TYPES,
+  "twitter|paid-social": PAID_SOCIAL_CAMPAIGN_TYPES,
+  "linkedin|paid-social": PAID_SOCIAL_CAMPAIGN_TYPES
 };
 
 const PAID_MEDIUMS = new Set(["cpc","paid-social","display","video"]);
@@ -383,8 +390,16 @@ fillSelect($("fy"), Array.from({length:11},(_,i)=>`fy${26+i}`));
 
 BRANCHES.forEach(b => {
   const o = document.createElement("option");
-  o.value = `${b.id} — ${b.name}`;
-  $("branches").appendChild(o);
+  o.value = b.id;
+  o.textContent = b.id;
+  $("branchId").appendChild(o);
+});
+
+$("branchId").addEventListener("change", () => {
+  const branch = BRANCHES.find(b => b.id === $("branchId").value) || null;
+  $("branchName").value = branch ? branch.name : "";
+  $("branchError").textContent = "";
+  updateCampaign();
 });
 
 function normalizeFreeText(value, maxWords=2) {
@@ -428,10 +443,9 @@ function updateCampaignType() {
   const source = selectedSource();
   const medium = $("medium").value;
   const key = `${source}|${medium}`;
-  const isPaid = PAID_MEDIUMS.has(medium);
   const options = CAMPAIGN_TYPES[key];
 
-  if (!isPaid) {
+  if (!options) {
     $("campaignTypeWrap").classList.add("hidden");
     $("campaignType").innerHTML = "";
     $("campaignTypeHint").textContent = "";
@@ -439,14 +453,8 @@ function updateCampaignType() {
   }
 
   $("campaignTypeWrap").classList.remove("hidden");
-
-  if (options) {
-    fillSelect($("campaignType"), options);
-    $("campaignTypeHint").textContent = "Required for this paid campaign.";
-  } else {
-    $("campaignType").innerHTML = '<option value="">Mapping not defined yet</option>';
-    $("campaignTypeHint").textContent = "This paid source/medium combination still needs a campaign type taxonomy.";
-  }
+  fillSelect($("campaignType"), options);
+  $("campaignTypeHint").textContent = "Required for this campaign.";
 }
 
 function getBranch() {
@@ -467,7 +475,7 @@ function updateCampaign() {
   const objective = $("objective").value;
   const medium = $("medium").value;
   const source = selectedSource();
-  const paid = PAID_MEDIUMS.has(medium);
+  const hasCampaignType = Boolean(CAMPAIGN_TYPES[`${source}|${medium}`]);
 
   let parts = [];
   if (branch) parts.push(branch.id, branch.name);
@@ -475,9 +483,8 @@ function updateCampaign() {
   if (identifier) parts.push(identifier);
   if (objective) parts.push(objective);
 
-  if (paid) {
-    const key = `${source}|${medium}`;
-    if (CAMPAIGN_TYPES[key] && $("campaignType").value) parts.push($("campaignType").value);
+  if (hasCampaignType && $("campaignType").value) {
+    parts.push($("campaignType").value);
   }
 
   $("campaignReadout").textContent = parts.length ? parts.join("_") : "Campaign name will appear here";
@@ -692,7 +699,7 @@ async function copyValue(value, button) {
 $("copyCampaign").onclick = () => copyValue($("campaignReadout").textContent,$("copyCampaign"));
 $("copyUrl").onclick = () => copyValue($("finalUrl").textContent,$("copyUrl"));
 
-fillSelect($("medium"), ALL_MEDIUMS);
+updateMediums();
 </script>
 </body>
 </html>
